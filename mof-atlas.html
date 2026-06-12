@@ -1,0 +1,3095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOF Atlas — Metal-Organic Framework Database</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://3dmol.org/build/3Dmol-min.js"></script>
+
+<style>
+:root {
+  --bg-deep:     #080F1C;
+  --bg-base:     #0B1425;
+  --bg-panel:    #0F1A30;
+  --bg-card:     #131E35;
+  --bg-card-hover: #172240;
+  --bg-input:    #0D1628;
+  --border:      #1E2D4A;
+  --border-bright: #2A3D60;
+  --cyan:        #00D4C8;
+  --cyan-dim:    #00A89E;
+  --cyan-glow:   rgba(0,212,200,0.15);
+  --amber:       #F0A030;
+  --amber-dim:   #C07818;
+  --text-primary: #E8F0FF;
+  --text-secondary: #7A90B0;
+  --text-muted:  #4A5E7A;
+  --text-mono:   #A0C4D0;
+  --success:     #2ECC71;
+  --warning:     #F39C12;
+  --metal-color: #8B9DC3;
+  --ligand-color: #C3A87A;
+  --topology-color: #A87AC3;
+  --font-main: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --transition: 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-main);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── SCROLLBAR ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cyan-dim); }
+
+/* ── HEADER ──────────────────────────────────────────── */
+#header {
+  position: relative;
+  height: 200px;
+  background: linear-gradient(135deg, #060D1A 0%, #0B1425 50%, #0A1830 100%);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 40px;
+}
+
+#topology-canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.header-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+}
+
+.header-logo {
+  flex-shrink: 0;
+}
+
+.logo-mark {
+  width: 56px;
+  height: 56px;
+}
+
+.header-titles {
+  flex: 1;
+}
+
+.header-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.header-title span {
+  color: var(--cyan);
+}
+
+.header-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-top: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header-stats {
+  display: flex;
+  gap: 28px;
+  flex-shrink: 0;
+}
+
+.stat-item {
+  text-align: right;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+/* ── MAIN LAYOUT ─────────────────────────────────────── */
+#app {
+  display: flex;
+  height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+/* ── FILTER RAIL ─────────────────────────────────────── */
+#filter-rail {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-section {
+  margin-bottom: 4px;
+}
+
+.rail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background var(--transition);
+  user-select: none;
+}
+
+.rail-section-header:hover { background: var(--bg-card); }
+
+.rail-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.rail-section-title.active { color: var(--cyan); }
+
+.rail-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+}
+
+.rail-chevron.open { transform: rotate(180deg); }
+
+.rail-section-body {
+  padding: 6px 4px 8px;
+}
+
+.rail-section-body.collapsed { display: none; }
+
+/* Search inputs */
+.filter-input-wrap {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.filter-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px 8px 32px;
+  font-family: var(--font-main);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.filter-input:focus {
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 0 2px var(--cyan-glow);
+}
+
+.filter-input::placeholder { color: var(--text-muted); }
+
+.filter-input-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* Tag-style multi-selects */
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.tag-pill {
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: transparent;
+  transition: all var(--transition);
+  font-family: var(--font-main);
+  white-space: nowrap;
+}
+
+.tag-pill:hover { border-color: var(--border-bright); color: var(--text-primary); }
+
+.tag-pill.active-metal {
+  border-color: var(--metal-color);
+  color: var(--metal-color);
+  background: rgba(139,157,195,0.1);
+}
+
+.tag-pill.active-ligand {
+  border-color: var(--ligand-color);
+  color: var(--ligand-color);
+  background: rgba(195,168,122,0.1);
+}
+
+.tag-pill.active-topology {
+  border-color: var(--topology-color);
+  color: var(--topology-color);
+  background: rgba(168,122,195,0.1);
+}
+
+.tag-pill.active-app {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-glow);
+}
+
+/* Range sliders */
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.range-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.range-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-bright);
+  outline: none;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+}
+
+.range-value {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--cyan);
+  width: 40px;
+  text-align: right;
+}
+
+/* Sort + clear */
+.rail-actions {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-rail {
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius);
+  font-family: var(--font-main);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.btn-rail:hover {
+  border-color: var(--cyan-dim);
+  color: var(--cyan);
+  background: var(--cyan-glow);
+}
+
+.btn-rail.primary {
+  border-color: var(--cyan-dim);
+  background: var(--cyan-glow);
+  color: var(--cyan);
+}
+
+.btn-rail.danger:hover {
+  border-color: #E74C3C;
+  color: #E74C3C;
+  background: rgba(231,76,60,0.1);
+}
+
+select.filter-select {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-family: var(--font-main);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  outline: none;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+select.filter-select:focus {
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 0 2px var(--cyan-glow);
+}
+
+/* ── RESULTS AREA ────────────────────────────────────── */
+#results-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#results-toolbar {
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-base);
+  flex-shrink: 0;
+}
+
+.results-count {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.results-count strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.results-count span.cyan { color: var(--cyan); }
+
+#main-search-wrap {
+  flex: 1;
+  position: relative;
+  max-width: 480px;
+}
+
+#main-search {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 9px 16px 9px 38px;
+  font-family: var(--font-main);
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+#main-search:focus {
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 0 3px var(--cyan-glow);
+}
+
+#main-search::placeholder { color: var(--text-muted); }
+
+.search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+
+.view-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all var(--transition);
+  border: none;
+  background: transparent;
+}
+
+.view-btn:hover { color: var(--text-primary); background: var(--bg-card); }
+.view-btn.active { background: var(--bg-card-hover); color: var(--cyan); }
+
+/* Active filter chips */
+#active-chips {
+  padding: 0 24px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 0;
+}
+
+.active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.active-chip:hover { border-color: #E74C3C; color: #E74C3C; }
+
+.active-chip .chip-x { color: var(--text-muted); font-size: 0.9em; }
+
+/* ── CARD GRID ───────────────────────────────────────── */
+#card-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+  align-content: start;
+}
+
+#card-grid.list-view {
+  grid-template-columns: 1fr;
+}
+
+.mof-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.mof-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.mof-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,212,200,0.08);
+}
+
+.mof-card:hover::before { opacity: 1; }
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.card-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.card-iupac {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+.card-year {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.card-formula {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-mono);
+  margin-bottom: 10px;
+  padding: 5px 8px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 4px;
+  border-left: 2px solid var(--cyan-dim);
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.card-tag {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.tag-metal { background: rgba(139,157,195,0.12); color: var(--metal-color); border: 1px solid rgba(139,157,195,0.25); }
+.tag-ligand { background: rgba(195,168,122,0.12); color: var(--ligand-color); border: 1px solid rgba(195,168,122,0.25); }
+.tag-topology { background: rgba(168,122,195,0.12); color: var(--topology-color); border: 1px solid rgba(168,122,195,0.25); }
+.tag-app { background: rgba(0,212,200,0.08); color: var(--cyan); border: 1px solid rgba(0,212,200,0.2); }
+.tag-sbu { background: rgba(240,160,48,0.1); color: var(--amber); border: 1px solid rgba(240,160,48,0.2); }
+
+.card-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.metric-box {
+  background: rgba(0,0,0,0.2);
+  border-radius: 5px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.card-group {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.card-group strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.card-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-family: var(--font-main);
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+
+.card-btn:hover {
+  border-color: var(--cyan-dim);
+  color: var(--cyan);
+  background: var(--cyan-glow);
+}
+
+.card-btn.primary {
+  border-color: var(--cyan-dim);
+  color: var(--cyan);
+  background: var(--cyan-glow);
+}
+
+.no-results {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-muted);
+}
+
+.no-results svg {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  display: block;
+  opacity: 0.3;
+}
+
+.no-results h3 {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.no-results p { font-size: 0.85rem; }
+
+/* ── DETAIL PANEL ────────────────────────────────────── */
+#detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(4, 8, 18, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#detail-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#detail-panel {
+  width: 860px;
+  max-width: 95vw;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  transform: translateX(40px);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+#detail-overlay.open #detail-panel {
+  transform: translateX(0);
+}
+
+.detail-close {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.detail-close-btn:hover { border-color: var(--cyan-dim); color: var(--cyan); }
+
+.detail-breadcrumb {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.detail-breadcrumb span { color: var(--text-secondary); }
+
+/* Detail sections */
+.detail-hero {
+  padding: 28px 28px 0;
+}
+
+.detail-name {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.detail-name .cyan { color: var(--cyan); }
+
+.detail-aliases {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-family: var(--font-mono);
+}
+
+.detail-formula-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+
+.detail-formula {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--text-mono);
+  background: rgba(0,0,0,0.3);
+  padding: 6px 12px;
+  border-radius: 5px;
+  border-left: 3px solid var(--cyan);
+}
+
+.detail-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Viewer + info two-column */
+.detail-body {
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.detail-viewer-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.viewer-container {
+  position: relative;
+  background: #050B18;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: 320px;
+}
+
+#viewer-3d {
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-controls {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  gap: 5px;
+  z-index: 5;
+}
+
+.viewer-btn {
+  padding: 4px 8px;
+  background: rgba(11,20,37,0.85);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-main);
+  transition: all var(--transition);
+}
+
+.viewer-btn:hover { border-color: var(--cyan-dim); color: var(--cyan); }
+
+.viewer-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Quick facts grid */
+.facts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.fact-item {
+  background: rgba(0,0,0,0.2);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+}
+
+.fact-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.fact-value {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.fact-value.mono { font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-mono); }
+.fact-value.cyan { color: var(--cyan); }
+.fact-value.amber { color: var(--amber); }
+.fact-value.topology { color: var(--topology-color); }
+
+/* Section headings */
+.detail-section {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.detail-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Properties table */
+.props-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.props-table th {
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.props-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(30,45,74,0.5);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+
+.props-table tr:last-child td { border-bottom: none; }
+
+.props-table td.mono {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-mono);
+}
+
+.props-table td.val {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Application pills */
+.apps-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.app-pill {
+  padding: 5px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-pill.demonstrated {
+  border-color: rgba(0,212,200,0.3);
+  color: var(--cyan);
+  background: var(--cyan-glow);
+}
+
+.app-pill.proposed {
+  border-color: rgba(240,160,48,0.3);
+  color: var(--amber);
+  background: rgba(240,160,48,0.05);
+}
+
+.app-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.app-dot.demo { background: var(--cyan); }
+.app-dot.prop { background: var(--amber); }
+
+/* References */
+.ref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ref-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  transition: border-color var(--transition);
+}
+
+.ref-item:hover { border-color: var(--border-bright); }
+
+.ref-title {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.ref-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.ref-journal { color: var(--text-secondary); }
+
+.ref-primary-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  background: var(--cyan-glow);
+  border: 1px solid rgba(0,212,200,0.3);
+  color: var(--cyan);
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.ref-doi {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--cyan-dim);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.ref-doi:hover { color: var(--cyan); }
+
+/* Ligand schematic */
+.ligand-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ligand-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  min-width: 160px;
+  flex: 1;
+}
+
+.ligand-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ligand-color);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ligand-smiles {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+
+.ligand-img-wrap {
+  background: #fff;
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+}
+
+.ligand-img-wrap img { max-width: 100%; max-height: 100px; }
+
+/* Gas sorption data */
+.sorption-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.sorption-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.sorption-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(30,45,74,0.5);
+  color: var(--text-secondary);
+}
+
+.sorption-table tr:last-child td { border-bottom: none; }
+
+.sorption-bar-cell { min-width: 120px; }
+
+.sorption-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sorption-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sorption-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+}
+
+.sorption-val {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  min-width: 60px;
+  text-align: right;
+}
+
+/* ── SKELETON / LOADING ──────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── ANIMATIONS ─────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mof-card { animation: fadeInUp 0.25s ease both; }
+
+/* ── TOOLTIP ─────────────────────────────────────────── */
+.tooltip {
+  position: fixed;
+  background: var(--bg-card);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+/* ── SEPARATOR DIVIDER ───────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  #filter-rail { width: 260px; }
+  .header-stats { display: none; }
+  .detail-viewer-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  #filter-rail { display: none; }
+  #header { height: 120px; padding: 0 20px; }
+  .header-title { font-size: 1.4rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─────────────────────── HEADER ──────────────────────────── -->
+<header id="header">
+  <canvas id="topology-canvas"></canvas>
+  <div class="header-content">
+    <div class="header-logo">
+      <svg class="logo-mark" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="28" cy="28" r="4" fill="#00D4C8"/>
+        <circle cx="28" cy="8"  r="3" fill="#00A89E"/>
+        <circle cx="28" cy="48" r="3" fill="#00A89E"/>
+        <circle cx="8"  cy="28" r="3" fill="#00A89E"/>
+        <circle cx="48" cy="28" r="3" fill="#00A89E"/>
+        <circle cx="12" cy="12" r="2.5" fill="#2A3D60"/>
+        <circle cx="44" cy="12" r="2.5" fill="#2A3D60"/>
+        <circle cx="12" cy="44" r="2.5" fill="#2A3D60"/>
+        <circle cx="44" cy="44" r="2.5" fill="#2A3D60"/>
+        <line x1="28" y1="28" x2="28" y2="8"  stroke="#00D4C8" stroke-width="1.5" stroke-opacity="0.6"/>
+        <line x1="28" y1="28" x2="28" y2="48" stroke="#00D4C8" stroke-width="1.5" stroke-opacity="0.6"/>
+        <line x1="28" y1="28" x2="8"  y2="28" stroke="#00D4C8" stroke-width="1.5" stroke-opacity="0.6"/>
+        <line x1="28" y1="28" x2="48" y2="28" stroke="#00D4C8" stroke-width="1.5" stroke-opacity="0.6"/>
+        <line x1="28" y1="8"  x2="12" y2="12" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="28" y1="8"  x2="44" y2="12" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="28" y1="48" x2="12" y2="44" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="28" y1="48" x2="44" y2="44" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="8"  y1="28" x2="12" y2="12" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="8"  y1="28" x2="12" y2="44" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="48" y1="28" x2="44" y2="12" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+        <line x1="48" y1="28" x2="44" y2="44" stroke="#2A3D60" stroke-width="1" stroke-opacity="0.8"/>
+      </svg>
+    </div>
+    <div class="header-titles">
+      <h1 class="header-title">MOF <span>Atlas</span></h1>
+      <div class="header-subtitle">Metal–Organic Framework Reference Database</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-item">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">Frameworks</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="stat-metals">—</div>
+        <div class="stat-label">Metal Nodes</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="stat-topologies">—</div>
+        <div class="stat-label">Topologies</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ─────────────────────── MAIN APP ──────────────────────────── -->
+<div id="app">
+
+  <!-- FILTER RAIL -->
+  <aside id="filter-rail">
+
+    <!-- Quick search -->
+    <div class="rail-section">
+      <div class="filter-input-wrap">
+        <svg class="filter-input-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 3.5 3.5"/>
+        </svg>
+        <input id="rail-search" class="filter-input" type="text" placeholder="Name / formula / alias…">
+      </div>
+    </div>
+
+    <!-- Metals -->
+    <div class="rail-section" id="sec-metals">
+      <div class="rail-section-header" onclick="toggleSection('metals')">
+        <span class="rail-section-title" id="title-metals">Metal Nodes</span>
+        <svg class="rail-chevron open" id="chev-metals" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-metals">
+        <div class="tag-cloud" id="metal-cloud"></div>
+      </div>
+    </div>
+
+    <!-- Ligands -->
+    <div class="rail-section" id="sec-ligands">
+      <div class="rail-section-header" onclick="toggleSection('ligands')">
+        <span class="rail-section-title" id="title-ligands">Ligands</span>
+        <svg class="rail-chevron open" id="chev-ligands" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-ligands">
+        <div class="tag-cloud" id="ligand-cloud"></div>
+      </div>
+    </div>
+
+    <!-- Topology -->
+    <div class="rail-section" id="sec-topology">
+      <div class="rail-section-header" onclick="toggleSection('topology')">
+        <span class="rail-section-title" id="title-topology">Topology</span>
+        <svg class="rail-chevron open" id="chev-topology" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-topology">
+        <div class="tag-cloud" id="topology-cloud"></div>
+      </div>
+    </div>
+
+    <!-- Applications -->
+    <div class="rail-section" id="sec-apps">
+      <div class="rail-section-header" onclick="toggleSection('apps')">
+        <span class="rail-section-title" id="title-apps">Applications</span>
+        <svg class="rail-chevron open" id="chev-apps" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-apps">
+        <div class="tag-cloud" id="app-cloud"></div>
+      </div>
+    </div>
+
+    <!-- SBU type -->
+    <div class="rail-section" id="sec-sbu">
+      <div class="rail-section-header" onclick="toggleSection('sbu')">
+        <span class="rail-section-title" id="title-sbu">SBU Type</span>
+        <svg class="rail-chevron open" id="chev-sbu" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-sbu">
+        <div class="tag-cloud" id="sbu-cloud"></div>
+      </div>
+    </div>
+
+    <!-- Interpenetration -->
+    <div class="rail-section" id="sec-interp">
+      <div class="rail-section-header" onclick="toggleSection('interp')">
+        <span class="rail-section-title" id="title-interp">Interpenetration</span>
+        <svg class="rail-chevron open" id="chev-interp" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-interp">
+        <select class="filter-select" id="interp-select">
+          <option value="">Any</option>
+          <option value="0">None (0-fold)</option>
+          <option value="1">1-fold</option>
+          <option value="2">2-fold</option>
+          <option value="3">3-fold</option>
+          <option value="4+">4-fold or higher</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Year range -->
+    <div class="rail-section" id="sec-year">
+      <div class="rail-section-header" onclick="toggleSection('year')">
+        <span class="rail-section-title" id="title-year">Discovery Year</span>
+        <svg class="rail-chevron open" id="chev-year" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 4 4 4-4"/></svg>
+      </div>
+      <div class="rail-section-body" id="body-year">
+        <div class="range-row">
+          <span class="range-label">From</span>
+          <input type="range" class="range-slider" id="year-from" min="1989" max="2024" value="1989">
+          <span class="range-value" id="year-from-val">1989</span>
+        </div>
+        <div class="range-row">
+          <span class="range-label">To</span>
+          <input type="range" class="range-slider" id="year-to" min="1989" max="2024" value="2024">
+          <span class="range-value" id="year-to-val">2024</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Sort -->
+    <div class="rail-section">
+      <div style="padding: 6px 4px 0;">
+        <select class="filter-select" id="sort-select">
+          <option value="name">Sort: Name (A–Z)</option>
+          <option value="year-asc">Sort: Year (oldest first)</option>
+          <option value="year-desc">Sort: Year (newest first)</option>
+          <option value="bet-desc">Sort: BET surface area ↓</option>
+          <option value="pore-desc">Sort: Pore size ↓</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="rail-actions">
+      <button class="btn-rail danger" onclick="clearFilters()">Clear All Filters</button>
+    </div>
+
+  </aside>
+
+  <!-- RESULTS AREA -->
+  <main id="results-area">
+    <div id="results-toolbar">
+      <div class="results-count" id="results-count">Loading…</div>
+      <div id="main-search-wrap">
+        <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 3.5 3.5"/>
+        </svg>
+        <input id="main-search" type="text" placeholder="Search all fields — name, formula, metal, ligand, group…">
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btn-grid" onclick="setView('grid')" title="Grid view">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+            <rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1"/>
+            <rect x="1" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/>
+          </svg>
+        </button>
+        <button class="view-btn" id="btn-list" onclick="setView('list')" title="List view">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5">
+            <line x1="1" y1="3.5" x2="14" y2="3.5"/><line x1="1" y1="7.5" x2="14" y2="7.5"/>
+            <line x1="1" y1="11.5" x2="14" y2="11.5"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="active-chips"></div>
+    <div id="card-grid"></div>
+  </main>
+</div>
+
+<!-- ─────────────────────── DETAIL PANEL ──────────────────────── -->
+<div id="detail-overlay" onclick="closeDetail(event)">
+  <div id="detail-panel">
+    <div class="detail-close">
+      <span class="detail-breadcrumb">MOF Atlas / <span id="detail-breadcrumb-name">—</span></span>
+      <button class="detail-close-btn" onclick="closeDetailBtn()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 1l12 12M13 1L1 13"/>
+        </svg>
+      </button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<!-- ─────────────────────── DATA ──────────────────────────────── -->
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  MOF DATABASE — embedded seed data
+//  Each entry is a full record. This JSON array can be replaced
+//  by a fetch() call to an external mofs.json / mofs.db file.
+// ═══════════════════════════════════════════════════════════════
+const MOF_DATA = [
+{
+  id: "MOF-5",
+  name: "MOF-5",
+  aliases: ["IRMOF-1","Zn4O(BDC)3"],
+  formula: "Zn4O(BDC)3 · (DMF)8(C6H5Cl)",
+  formula_clean: "[Zn4O(BDC)3]n",
+  year: 1999,
+  group: "Yaghi (UCLA / Berkeley)",
+  crystal_system: "Cubic",
+  space_group: "Fm3̄m",
+  a: 25.832, b: 25.832, c: 25.832,
+  topology: "pcu",
+  sbu: "Zn4O(CO2)6 octahedral",
+  sbu_type: "Paddlewheel-related / Zn4O cluster",
+  interpenetration: 0,
+  pore_size_A: 14.3,
+  pore_volume_cc_g: 1.04,
+  bet_m2_g: 3534,
+  density_g_cc: 0.59,
+  metals: ["Zn"],
+  ligands: [
+    { name: "BDC", fullname: "1,4-benzenedicarboxylate", smiles: "OC(=O)c1ccc(cc1)C(O)=O" }
+  ],
+  cod_id: "1508505",
+  cif_local: null,
+  applications: [
+    { name: "Hydrogen storage", status: "demonstrated" },
+    { name: "Gas storage (CO₂, CH₄)", status: "demonstrated" },
+    { name: "Template for IRMOF series", status: "demonstrated" },
+    { name: "Drug delivery", status: "proposed" }
+  ],
+  sorption: [
+    { gas: "H₂", T_K: 77, P_bar: 1, uptake: 1.32, unit: "wt%" },
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 21.7, unit: "cm³/g" },
+    { gas: "CH₄", T_K: 298, P_bar: 35, uptake: 135, unit: "cm³/g" }
+  ],
+  description: "MOF-5 (also IRMOF-1) is the landmark Zn-based MOF that launched the modern era of reticular chemistry. It was the first MOF shown to have a permanent, ultrahigh porosity accessible for gas storage. The cubic structure features Zn4O clusters bridged by BDC linkers in a primitive cubic net. It remains the benchmark for evaluating new porous materials.",
+  references: [
+    { primary: true,  authors: "Li, H.; Eddaoudi, M.; O'Keeffe, M.; Yaghi, O. M.", year: 1999, title: "Design and synthesis of an exceptionally stable and highly porous metal-organic framework", journal: "Nature", volume: "402", pages: "276–279", doi: "10.1038/46248" },
+    { primary: false, authors: "Rowsell, J. L. C.; Yaghi, O. M.", year: 2004, title: "Metal–organic frameworks: a new class of porous materials", journal: "Microporous Mesoporous Mater.", volume: "73", pages: "3–14", doi: "10.1016/j.micromeso.2004.03.034" },
+    { primary: false, authors: "Furukawa, H. et al.", year: 2010, title: "Ultrahigh Porosity in Metal-Organic Frameworks", journal: "Science", volume: "329", pages: "424–428", doi: "10.1126/science.1192160" }
+  ],
+  category: "Zn-carboxylate"
+},
+{
+  id: "HKUST-1",
+  name: "HKUST-1",
+  aliases: ["Cu-BTC","MOF-199","[Cu3(BTC)2]"],
+  formula: "[Cu3(BTC)2(H2O)3]n",
+  formula_clean: "[Cu3(BTC)2]n",
+  year: 1999,
+  group: "Williams (Hong Kong Univ. of Science & Technology)",
+  crystal_system: "Cubic",
+  space_group: "Fm3̄m",
+  a: 26.343, b: 26.343, c: 26.343,
+  topology: "tbo",
+  sbu: "Cu2(CO2)4 paddlewheel",
+  sbu_type: "Dinuclear paddlewheel",
+  interpenetration: 0,
+  pore_size_A: 9.0,
+  pore_volume_cc_g: 0.75,
+  bet_m2_g: 1850,
+  density_g_cc: 0.88,
+  metals: ["Cu"],
+  ligands: [
+    { name: "BTC", fullname: "1,3,5-benzenetricarboxylate (trimesate)", smiles: "OC(=O)c1cc(C(O)=O)cc(C(O)=O)c1" }
+  ],
+  cod_id: "1511445",
+  cif_local: null,
+  applications: [
+    { name: "Gas storage (CO₂, CH₄, H₂)", status: "demonstrated" },
+    { name: "Catalysis (Lewis acid)", status: "demonstrated" },
+    { name: "Sensors", status: "demonstrated" },
+    { name: "Drug delivery", status: "demonstrated" },
+    { name: "Water harvesting", status: "proposed" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 72.4, unit: "cm³/g" },
+    { gas: "CH₄", T_K: 298, P_bar: 1, uptake: 32.3, unit: "cm³/g" },
+    { gas: "H₂O", T_K: 298, P_bar: 0.9, uptake: 420, unit: "cm³/g" }
+  ],
+  description: "HKUST-1 features the iconic Cu2 paddlewheel SBU bridged by tritopic BTC linkers to form a tbo topology with three distinct cage environments. The open Cu² coordination sites after solvent removal act as Lewis acid sites. It is the most studied MOF commercially and is sold by Sigma-Aldrich as Basolite C300.",
+  references: [
+    { primary: true,  authors: "Chui, S. S.-Y.; Lo, S. M.-F.; Charmant, J. P. H.; Orpen, A. G.; Williams, I. D.", year: 1999, title: "A Chemically Functionalizable Nanoporous Material [Cu3(TMA)2(H2O)3]n", journal: "Science", volume: "283", pages: "1148–1150", doi: "10.1126/science.283.5405.1148" },
+    { primary: false, authors: "Rowsell, J. L. C.; Yaghi, O. M.", year: 2004, title: "Metal–organic frameworks: a new class of porous materials", journal: "Microporous Mesoporous Mater.", volume: "73", pages: "3–14", doi: "10.1016/j.micromeso.2004.03.034" }
+  ],
+  category: "Cu-carboxylate"
+},
+{
+  id: "ZIF-8",
+  name: "ZIF-8",
+  aliases: ["MAF-4","[Zn(mIM)2]"],
+  formula: "[Zn(mIM)2]n",
+  formula_clean: "[Zn(2-methylimidazolate)2]n",
+  year: 2006,
+  group: "Yaghi (UCLA) / Banerjee",
+  crystal_system: "Cubic",
+  space_group: "I4̄3m",
+  a: 16.991, b: 16.991, c: 16.991,
+  topology: "sod",
+  sbu: "Zn(Im)4 tetrahedral node",
+  sbu_type: "Mononuclear tetrahedral",
+  interpenetration: 0,
+  pore_size_A: 3.4,
+  pore_volume_cc_g: 0.636,
+  bet_m2_g: 1630,
+  density_g_cc: 0.924,
+  metals: ["Zn"],
+  ligands: [
+    { name: "mIM", fullname: "2-methylimidazolate", smiles: "Cc1ncc[nH]1" }
+  ],
+  cod_id: "1443070",
+  cif_local: null,
+  applications: [
+    { name: "CO₂/CH₄ separation", status: "demonstrated" },
+    { name: "H₂/CO₂ separation", status: "demonstrated" },
+    { name: "Membrane fabrication", status: "demonstrated" },
+    { name: "Drug delivery", status: "demonstrated" },
+    { name: "Biomimetic encapsulation", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 273, P_bar: 1, uptake: 28.0, unit: "cm³/g" },
+    { gas: "CH₄", T_K: 273, P_bar: 1, uptake: 13.2, unit: "cm³/g" },
+    { gas: "H₂", T_K: 77, P_bar: 1, uptake: 1.3, unit: "wt%" }
+  ],
+  description: "ZIF-8 adopts the sodalite (sod) topology with Zn²⁺ bridged by 2-methylimidazolate in a framework that is isotypic with zeolite sodalite. The narrow pore aperture (3.4 Å) gives excellent molecular sieving properties yet the flexible framework shows a 'gate-opening' phenomenon. Exceptionally thermally (up to 550°C in N₂) and chemically stable.",
+  references: [
+    { primary: true,  authors: "Park, K. S. et al.", year: 2006, title: "Exceptional chemical and thermal stability of zeolitic imidazolate frameworks", journal: "Proc. Natl. Acad. Sci. USA", volume: "103", pages: "10186–10191", doi: "10.1073/pnas.0602439103" },
+    { primary: false, authors: "Banerjee, R. et al.", year: 2008, title: "High-Throughput Synthesis of Zeolitic Imidazolate Frameworks and Application to CO2 Capture", journal: "Science", volume: "319", pages: "939–943", doi: "10.1126/science.1152516" },
+    { primary: false, authors: "Phan, A. et al.", year: 2010, title: "Synthesis, structure, and carbon dioxide capture properties of zeolitic imidazolate frameworks", journal: "Acc. Chem. Res.", volume: "43", pages: "58–67", doi: "10.1021/ar900116g" }
+  ],
+  category: "ZIF / Zeolitic Imidazolate Framework"
+},
+{
+  id: "UiO-66",
+  name: "UiO-66",
+  aliases: ["Zr-BDC","[Zr6O4(OH)4(BDC)6]"],
+  formula: "[Zr6O4(OH)4(BDC)6]n",
+  formula_clean: "[Zr6O4(OH)4(C8H4O4)6]n",
+  year: 2008,
+  group: "Lillerud / Olsbye (Oslo)",
+  crystal_system: "Cubic",
+  space_group: "Fm3̄m",
+  a: 20.7, b: 20.7, c: 20.7,
+  topology: "fcu",
+  sbu: "Zr6O4(OH)4(CO2)12 cuboctahedral cluster",
+  sbu_type: "Hexanuclear Zr cluster",
+  interpenetration: 0,
+  pore_size_A: 6.0,
+  pore_volume_cc_g: 0.40,
+  bet_m2_g: 1187,
+  density_g_cc: 1.24,
+  metals: ["Zr"],
+  ligands: [
+    { name: "BDC", fullname: "1,4-benzenedicarboxylate", smiles: "OC(=O)c1ccc(cc1)C(O)=O" }
+  ],
+  cod_id: "4511734",
+  cif_local: null,
+  applications: [
+    { name: "Catalysis (acid)", status: "demonstrated" },
+    { name: "Chemical warfare agent hydrolysis", status: "demonstrated" },
+    { name: "Drug delivery", status: "demonstrated" },
+    { name: "Water treatment / heavy metal removal", status: "demonstrated" },
+    { name: "CO₂ capture", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 22.2, unit: "cm³/g" },
+    { gas: "N₂", T_K: 77, P_bar: 1, uptake: 230, unit: "cm³/g" }
+  ],
+  description: "UiO-66 (Universitetet i Oslo-66) is the most studied zirconium MOF. The Zr6O4(OH)4 oxo-cluster SBU is 12-connected by BDC linkers in an fcu topology, giving exceptional thermal stability (up to ~500°C) and water/chemical resistance. The linker-missing defect chemistry in UiO-66 provides Lewis and Brønsted acid sites. It is available commercially.",
+  references: [
+    { primary: true,  authors: "Cavka, J. H. et al.", year: 2008, title: "A New Zirconium Inorganic Building Brick Forming Metal Organic Frameworks with Exceptional Stability", journal: "J. Am. Chem. Soc.", volume: "130", pages: "13850–13851", doi: "10.1021/ja8057953" },
+    { primary: false, authors: "Valenzano, L. et al.", year: 2011, title: "Disclosing the Complex Structure of UiO-66 Metal Organic Framework: A Synergic Combination of Experiment and Theory", journal: "Chem. Mater.", volume: "23", pages: "1700–1718", doi: "10.1021/cm1022882" }
+  ],
+  category: "Zr-carboxylate"
+},
+{
+  id: "MIL-53",
+  name: "MIL-53",
+  aliases: ["MIL-53(Al)","Al(OH)(BDC)","[Al(OH)(BDC)]n"],
+  formula: "[Al(OH)(BDC)]n · xH2O",
+  formula_clean: "[Al(OH)(BDC)]n",
+  year: 2002,
+  group: "Férey (Versailles)",
+  crystal_system: "Orthorhombic",
+  space_group: "Imma",
+  a: 6.608, b: 16.675, c: 12.813,
+  topology: "sra",
+  sbu: "Al–OH–Al trans-corner-sharing octahedral chain",
+  sbu_type: "Infinite rod / chain",
+  interpenetration: 0,
+  pore_size_A: 8.5,
+  pore_volume_cc_g: 0.50,
+  bet_m2_g: 1100,
+  density_g_cc: 1.25,
+  metals: ["Al"],
+  ligands: [
+    { name: "BDC", fullname: "1,4-benzenedicarboxylate", smiles: "OC(=O)c1ccc(cc1)C(O)=O" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "CO₂/CH₄ separation", status: "demonstrated" },
+    { name: "Breathing / flexible MOF study", status: "demonstrated" },
+    { name: "Xylene isomer separation", status: "demonstrated" },
+    { name: "Drug delivery", status: "proposed" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 304, P_bar: 1, uptake: 40.0, unit: "cm³/g" },
+    { gas: "CH₄", T_K: 304, P_bar: 1, uptake: 12.5, unit: "cm³/g" }
+  ],
+  description: "MIL-53(Al) is the archetypal 'breathing' MOF. Under guest adsorption/desorption, the structure reversibly transforms between a large-pore (lp) and narrow-pore (np) form with a ~40% unit cell volume change. This structural flexibility is driven by host–guest and host–host interactions. MIL-53 variants exist for Cr, Fe, V, Ga, Sc and In.",
+  references: [
+    { primary: true,  authors: "Serre, C. et al.", year: 2002, title: "Role of Solvent-Host Interactions That Lead to Very Large Swelling of Hybrid Frameworks", journal: "Science", volume: "315", pages: "1828–1831", doi: "10.1126/science.1137208" },
+    { primary: false, authors: "Loiseau, T. et al.", year: 2004, title: "A Rationale for the Large Breathing of the Porous Aluminum Terephthalate (MIL-53) upon Hydration", journal: "Chem. Eur. J.", volume: "10", pages: "1373–1382", doi: "10.1002/chem.200305413" }
+  ],
+  category: "MIL / Flexible MOF"
+},
+{
+  id: "MIL-101",
+  name: "MIL-101(Cr)",
+  aliases: ["MIL-101","Cr3F(BDC)3"],
+  formula: "Cr3F(H2O)2O[(C8H4O4)]3 · nH2O",
+  formula_clean: "[Cr3F(H2O)2O(BDC)3]n",
+  year: 2005,
+  group: "Férey (Versailles)",
+  crystal_system: "Cubic",
+  space_group: "Fd3̄m",
+  a: 88.869, b: 88.869, c: 88.869,
+  topology: "mtn",
+  sbu: "Cr3O(CO2)6F trimeric cluster",
+  sbu_type: "Trinuclear μ3-oxo cluster",
+  interpenetration: 0,
+  pore_size_A: 29.0,
+  pore_volume_cc_g: 2.0,
+  bet_m2_g: 5900,
+  density_g_cc: 0.44,
+  metals: ["Cr"],
+  ligands: [
+    { name: "BDC", fullname: "1,4-benzenedicarboxylate (terephthalate)", smiles: "OC(=O)c1ccc(cc1)C(O)=O" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Catalysis", status: "demonstrated" },
+    { name: "Drug storage and release", status: "demonstrated" },
+    { name: "CO₂ capture", status: "demonstrated" },
+    { name: "Heavy metal ion removal", status: "demonstrated" },
+    { name: "H₂ storage", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "N₂", T_K: 77, P_bar: 1, uptake: 1760, unit: "cm³/g" },
+    { gas: "CO₂", T_K: 304, P_bar: 50, uptake: 400, unit: "cm³/g" }
+  ],
+  description: "MIL-101(Cr) holds one of the largest unit cells (a ≈ 88.9 Å) among MOFs, with a giant MTN zeotype topology containing two distinct cage types (25 and 29 Å). Its record-breaking surface area (up to 5900 m²/g) and large pores make it exceptional for bulky molecule loading. Chromium(III) trimeric clusters are bridged by BDC in a supertetrahedron-based architecture.",
+  references: [
+    { primary: true,  authors: "Férey, G. et al.", year: 2005, title: "A Chromium Terephthalate-Based Solid with Unusually Large Pore Volumes and Surface Area", journal: "Science", volume: "309", pages: "2040–2042", doi: "10.1126/science.1116275" },
+    { primary: false, authors: "Hong, D.-Y. et al.", year: 2009, title: "Selective CO2 Adsorption of an Amine-Functionalized Mixed-Ligand Metal-Organic Framework", journal: "Adv. Funct. Mater.", volume: "19", pages: "1537–1552", doi: "10.1002/adfm.200801461" }
+  ],
+  category: "MIL / Cr-carboxylate"
+},
+{
+  id: "NOTT-112",
+  name: "NOTT-112",
+  aliases: ["PCN-12","Cu-TDEI"],
+  formula: "[Cu3(TDEI)(H2O)3]n",
+  formula_clean: "[Cu3(C54H30O12)]n",
+  year: 2009,
+  group: "Schröder (Nottingham) / Zhou (Texas A&M)",
+  crystal_system: "Cubic",
+  space_group: "Fm3̄m",
+  a: 23.63, b: 23.63, c: 23.63,
+  topology: "tbo",
+  sbu: "Cu2(CO2)4 paddlewheel",
+  sbu_type: "Dinuclear paddlewheel",
+  interpenetration: 0,
+  pore_size_A: 12.6,
+  pore_volume_cc_g: 1.62,
+  bet_m2_g: 3800,
+  density_g_cc: 0.45,
+  metals: ["Cu"],
+  ligands: [
+    { name: "TDEI", fullname: "5,5',5''-[2,4,6-trimethylbenzene-1,3,5-triyl-tris(ethyne-2,1-diyl)]triisophthalate", smiles: "OC(=O)c1cc(C(O)=O)cc(C#Cc2c(C)c(C#Cc3cc(C(O)=O)cc(C(O)=O)c3)c(C)c(C#Cc3cc(C(O)=O)cc(C(O)=O)c3)c2C)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "H₂ storage", status: "demonstrated" },
+    { name: "CH₄ storage", status: "demonstrated" },
+    { name: "CO₂ capture", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "H₂", T_K: 77, P_bar: 20, uptake: 6.07, unit: "wt%" },
+    { gas: "CH₄", T_K: 298, P_bar: 35, uptake: 230, unit: "cm³/g" }
+  ],
+  description: "NOTT-112 features a large isophthalate-based hexatopic linker creating an exceptionally high-porosity tbo topology framework. The open Cu² sites and large pore volume give it among the highest gravimetric H₂ uptakes reported. It is a benchmark material for high-pressure gas storage evaluation.",
+  references: [
+    { primary: true,  authors: "Yan, Y. et al.", year: 2009, title: "Exceptionally High H2 Storage by a Metal-Organic Polyhedral Framework", journal: "Chem. Commun.", volume: "", pages: "1025–1027", doi: "10.1039/b900013e" }
+  ],
+  category: "Cu-carboxylate / High-surface-area"
+},
+{
+  id: "MOF-74",
+  name: "MOF-74",
+  aliases: ["Zn-MOF-74","CPO-27-Zn","[Zn2(DOBDC)]"],
+  formula: "[Zn2(C8H2O6)]n",
+  formula_clean: "[Zn2(DOBDC)]n",
+  year: 2005,
+  group: "Rosi (Pittsburgh) / Yaghi",
+  crystal_system: "Trigonal",
+  space_group: "R3̄",
+  a: 25.932, b: 25.932, c: 6.837,
+  topology: "etb",
+  sbu: "Zn2(CO2)2(OH) rod SBU (helical)",
+  sbu_type: "Infinite rod / helical chain",
+  interpenetration: 0,
+  pore_size_A: 11.8,
+  pore_volume_cc_g: 0.51,
+  bet_m2_g: 816,
+  density_g_cc: 1.22,
+  metals: ["Zn"],
+  ligands: [
+    { name: "DOBDC", fullname: "2,5-dioxido-1,4-benzenedicarboxylate (DOT)", smiles: "OC(=O)c1cc(C(O)=O)c(O)c(O)c1" }
+  ],
+  cod_id: "2004249",
+  cif_local: null,
+  applications: [
+    { name: "CO₂ capture (high selectivity)", status: "demonstrated" },
+    { name: "CH₄ storage", status: "demonstrated" },
+    { name: "O₂/N₂ separation", status: "demonstrated" },
+    { name: "Ethylene/ethane separation", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 65.0, unit: "cm³/g" },
+    { gas: "CH₄", T_K: 298, P_bar: 35, uptake: 149, unit: "cm³/g" }
+  ],
+  description: "MOF-74 (CPO-27) features one-dimensional hexagonal channels with a high density of open metal coordination sites on the channel walls. The DOBDC linker provides two hydroxyl groups that bind directly to the metal. The M-MOF-74 isoreticular series spans Mg, Mn, Fe, Co, Ni, Cu, Zn — with Mg-MOF-74 showing outstanding CO₂ uptake due to strong electrostatic binding.",
+  references: [
+    { primary: true,  authors: "Rosi, N. L. et al.", year: 2005, title: "Infinite Secondary Building Units and Forbidden Catenation in Metal-Organic Frameworks", journal: "Angew. Chem. Int. Ed.", volume: "44", pages: "2973–2977", doi: "10.1002/anie.200462521" },
+    { primary: false, authors: "Dietzel, P. D. C. et al.", year: 2009, title: "Adsorption properties and structure of CO2 adsorbed on open coordination sites of metal–organic framework Ni2(dhtp)", journal: "Chem. Commun.", pages: "5125–5127", doi: "10.1039/b911242a" }
+  ],
+  category: "M-MOF-74 series"
+},
+{
+  id: "MIL-100",
+  name: "MIL-100(Fe)",
+  aliases: ["MIL-100","Fe3O(BTC)2"],
+  formula: "[Fe3O(H2O)2F](BTC)2 · nH2O",
+  formula_clean: "[Fe3O(BTC)2]n",
+  year: 2004,
+  group: "Férey (Versailles)",
+  crystal_system: "Cubic",
+  space_group: "Fd3̄m",
+  a: 72.47, b: 72.47, c: 72.47,
+  topology: "mtn",
+  sbu: "Fe3O(CO2)6 trimeric cluster",
+  sbu_type: "Trinuclear μ3-oxo cluster",
+  interpenetration: 0,
+  pore_size_A: 25.0,
+  pore_volume_cc_g: 1.12,
+  bet_m2_g: 2800,
+  density_g_cc: 0.98,
+  metals: ["Fe"],
+  ligands: [
+    { name: "BTC", fullname: "1,3,5-benzenetricarboxylate (trimesate)", smiles: "OC(=O)c1cc(C(O)=O)cc(C(O)=O)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Drug delivery (ibuprofen, caffeine)", status: "demonstrated" },
+    { name: "CO₂ capture", status: "demonstrated" },
+    { name: "Redox catalysis", status: "demonstrated" },
+    { name: "Biomedical imaging (MRI contrast)", status: "proposed" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 304, P_bar: 1, uptake: 165, unit: "cm³/g" },
+    { gas: "H₂", T_K: 77, P_bar: 1, uptake: 1.0, unit: "wt%" }
+  ],
+  description: "MIL-100(Fe) is an Fe³⁺ analogue of MIL-101 based on BTC (trimesic acid) rather than BDC. Its MTN zeotype cage topology contains two types of mesoporous cages. Iron(III) trimeric clusters confer redox activity (Fe³⁺/Fe²⁺ switching). The material is considered biocompatible, making it attractive for drug delivery and MRI contrast applications.",
+  references: [
+    { primary: true,  authors: "Horcajada, P. et al.", year: 2007, title: "Flexible porous metal-organic frameworks for a controlled drug delivery", journal: "J. Am. Chem. Soc.", volume: "130", pages: "6774–6780", doi: "10.1021/ja710973k" },
+    { primary: false, authors: "Horcajada, P. et al.", year: 2010, title: "Porous metal–organic-framework nanoscale carriers as a potential platform for drug delivery and imaging", journal: "Nat. Mater.", volume: "9", pages: "172–178", doi: "10.1038/nmat2608" }
+  ],
+  category: "MIL / Fe-carboxylate"
+},
+{
+  id: "PCN-14",
+  name: "PCN-14",
+  aliases: ["[Cu2(adip)(H2O)2]","Cu-adip"],
+  formula: "[Cu2(C36H18O10)(H2O)2]n",
+  formula_clean: "[Cu2(adip)]n",
+  year: 2007,
+  group: "Zhou (Texas A&M)",
+  crystal_system: "Tetragonal",
+  space_group: "P4/mmm",
+  a: 11.779, b: 11.779, c: 21.595,
+  topology: "nbo",
+  sbu: "Cu2(CO2)4 paddlewheel",
+  sbu_type: "Dinuclear paddlewheel",
+  interpenetration: 0,
+  pore_size_A: 7.8,
+  pore_volume_cc_g: 0.87,
+  bet_m2_g: 2170,
+  density_g_cc: 0.83,
+  metals: ["Cu"],
+  ligands: [
+    { name: "adip", fullname: "5,5'-(anthracene-9,10-diyl)diisophthalate", smiles: "OC(=O)c1cc(C(O)=O)cc(c2c3cc(C(O)=O)cc(C(O)=O)c3c3ccccc23)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Methane storage (high volumetric)", status: "demonstrated" },
+    { name: "CO₂ storage", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CH₄", T_K: 290, P_bar: 35, uptake: 230, unit: "v/v" },
+    { gas: "CO₂", T_K: 290, P_bar: 1, uptake: 55.0, unit: "cm³/g" }
+  ],
+  description: "PCN-14 contains anthracene-based octacarboxylate linkers forming an nbo topology with Cu paddlewheel SBUs. At the time of its report it held the record for volumetric methane storage (230 v/v at 290 K, 35 bar), exceeding the DOE target. The hydrophobic anthracene core provides enhanced methane uptake via dispersion interactions.",
+  references: [
+    { primary: true,  authors: "Ma, S. et al.", year: 2008, title: "Metal-Organic Framework from an Anthracene Derivative Containing Nanoscopic Cages Exhibiting High Methane Uptake", journal: "J. Am. Chem. Soc.", volume: "130", pages: "1012–1016", doi: "10.1021/ja0771639" }
+  ],
+  category: "Cu-carboxylate / CH₄ storage"
+},
+{
+  id: "NU-125",
+  name: "NU-125",
+  aliases: ["Cu-TTEI"],
+  formula: "[Cu3(TTEI)(H2O)3]n",
+  formula_clean: "[Cu3(TTEI)]n",
+  year: 2012,
+  group: "Farha / Hupp (Northwestern)",
+  crystal_system: "Cubic",
+  space_group: "Fm3̄m",
+  a: 18.60, b: 18.60, c: 18.60,
+  topology: "tbo",
+  sbu: "Cu2(CO2)4 paddlewheel",
+  sbu_type: "Dinuclear paddlewheel",
+  interpenetration: 0,
+  pore_size_A: 9.1,
+  pore_volume_cc_g: 1.29,
+  bet_m2_g: 3120,
+  density_g_cc: 0.578,
+  metals: ["Cu"],
+  ligands: [
+    { name: "TTEI", fullname: "5,5',5''-((1,3,5-triazine-2,4,6-triyl)tris(azanediyl))triisophthalate", smiles: "OC(=O)c1cc(C(O)=O)cc(Nc2nc(Nc3cc(C(O)=O)cc(C(O)=O)c3)nc(Nc3cc(C(O)=O)cc(C(O)=O)c3)n2)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "CH₄ storage", status: "demonstrated" },
+    { name: "CO₂ capture", status: "demonstrated" },
+    { name: "H₂ storage", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CH₄", T_K: 298, P_bar: 65, uptake: 246, unit: "cm³/g" },
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 45.3, unit: "cm³/g" }
+  ],
+  description: "NU-125 uses a triazine-based hexatopic isophthalate linker designed to maximise packing efficiency of Cu paddlewheel nodes. The tbo topology network gives excellent volumetric methane storage. The triazine core adds Lewis-basic nitrogen sites that enhance CO₂ binding.",
+  references: [
+    { primary: true,  authors: "Wilmer, C. E. et al.", year: 2012, title: "Large-scale screening of hypothetical metal–organic frameworks", journal: "Nat. Chem.", volume: "4", pages: "83–89", doi: "10.1038/nchem.1192" },
+    { primary: false, authors: "Farha, O. K. et al.", year: 2012, title: "Metal–organic framework materials with ultrahigh surface areas", journal: "J. Am. Chem. Soc.", volume: "134", pages: "15016–15021", doi: "10.1021/ja3055639" }
+  ],
+  category: "Cu-carboxylate / Gas storage"
+},
+{
+  id: "MOF-177",
+  name: "MOF-177",
+  aliases: ["Zn4O(BTB)2","[Zn4O(BTB)2]"],
+  formula: "[Zn4O(C45H27O6)2]n",
+  formula_clean: "[Zn4O(BTB)2]n",
+  year: 2004,
+  group: "Yaghi (UCLA)",
+  crystal_system: "Trigonal",
+  space_group: "P3̄1c",
+  a: 37.06, b: 37.06, c: 30.02,
+  topology: "qom",
+  sbu: "Zn4O(CO2)6 octahedral cluster",
+  sbu_type: "Paddlewheel-related / Zn4O cluster",
+  interpenetration: 0,
+  pore_size_A: 10.8,
+  pore_volume_cc_g: 1.69,
+  bet_m2_g: 4500,
+  density_g_cc: 0.427,
+  metals: ["Zn"],
+  ligands: [
+    { name: "BTB", fullname: "4,4',4''-benzene-1,3,5-triyl-tribenzoate", smiles: "OC(=O)c1ccc(cc1)c1cc(c2ccc(C(O)=O)cc2)cc(c2ccc(C(O)=O)cc2)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "CO₂ storage", status: "demonstrated" },
+    { name: "H₂ storage", status: "demonstrated" },
+    { name: "CH₄ storage", status: "demonstrated" },
+    { name: "Organic molecule storage", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 42, uptake: 1470, unit: "mg/g" },
+    { gas: "H₂", T_K: 77, P_bar: 70, uptake: 7.5, unit: "wt%" },
+    { gas: "CH₄", T_K: 298, P_bar: 35, uptake: 235, unit: "cm³/g" }
+  ],
+  description: "MOF-177 extends the IRMOF series to a large tritopic BTB linker generating the qom topology. At the time of its report it had the highest BET surface area of any known porous material (4500 m²/g). The giant cages accommodate large organic molecules. It exemplifies the design principle of expanding surface area via longer linkers in the Zn4O SBU series.",
+  references: [
+    { primary: true,  authors: "Chae, H. K. et al.", year: 2004, title: "A route to high surface area, porosity and inclusion of large molecules in crystals", journal: "Nature", volume: "427", pages: "523–527", doi: "10.1038/nature02311" }
+  ],
+  category: "Zn-carboxylate"
+},
+{
+  id: "NU-1000",
+  name: "NU-1000",
+  aliases: ["Zr6-pyrene-MOF","[Zr6O8H4(TBAPy)2]"],
+  formula: "[Zr6O8H4(TBAPy)2]n",
+  formula_clean: "[Zr6(μ3-O)4(μ3-OH)4(TBAPy)2]n",
+  year: 2013,
+  group: "Farha / Hupp (Northwestern)",
+  crystal_system: "Hexagonal",
+  space_group: "P6/mmm",
+  a: 39.77, b: 39.77, c: 16.65,
+  topology: "csq",
+  sbu: "Zr6O8H4 oxo-hydroxo cluster (8-connected)",
+  sbu_type: "Hexanuclear Zr cluster (8-connected)",
+  interpenetration: 0,
+  pore_size_A: 31.0,
+  pore_volume_cc_g: 1.46,
+  bet_m2_g: 2320,
+  density_g_cc: 0.42,
+  metals: ["Zr"],
+  ligands: [
+    { name: "TBAPy", fullname: "1,3,6,8-tetrakis(p-benzoic acid)pyrene", smiles: "OC(=O)c1ccc(cc1)c1cc(c2ccc(C(O)=O)cc2)c2cc(c3ccc(C(O)=O)cc3)cc(c2c1)c1ccc(C(O)=O)cc1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Atomic layer deposition of catalysts (ALD@MOF)", status: "demonstrated" },
+    { name: "Photocatalysis", status: "demonstrated" },
+    { name: "Enzyme immobilisation", status: "demonstrated" },
+    { name: "Chemical warfare agent hydrolysis", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "N₂", T_K: 77, P_bar: 1, uptake: 1070, unit: "cm³/g" }
+  ],
+  description: "NU-1000 is a mesoporous Zr-based MOF with large hexagonal and triangular pores suitable for enzyme and nanoparticle immobilisation. The 8-connected Zr6 node in csq topology leaves four aqua/hydroxyl sites per node for post-synthetic metalation. It has become the benchmark platform for Zr-MOF surface chemistry and ALD infiltration.",
+  references: [
+    { primary: true,  authors: "Mondloch, J. E. et al.", year: 2013, title: "Vapor-Phase Metalation by Atomic Layer Deposition in a Metal–Organic Framework", journal: "J. Am. Chem. Soc.", volume: "135", pages: "10294–10297", doi: "10.1021/ja4050828" },
+    { primary: false, authors: "Klet, R. C. et al.", year: 2016, title: "Evaluation of Brønsted acid and base sites in Zr- and Hf-based metal–organic frameworks using potentiometric acid–base titration", journal: "J. Mater. Chem. A", volume: "4", pages: "1479–1485", doi: "10.1039/c5ta07228h" }
+  ],
+  category: "Zr-carboxylate / Mesoporous"
+},
+{
+  id: "ZIF-67",
+  name: "ZIF-67",
+  aliases: ["Co-ZIF-67","[Co(mIM)2]"],
+  formula: "[Co(2-methylimidazolate)2]n",
+  formula_clean: "[Co(mIM)2]n",
+  year: 2008,
+  group: "Yaghi / Banerjee",
+  crystal_system: "Cubic",
+  space_group: "I4̄3m",
+  a: 16.959, b: 16.959, c: 16.959,
+  topology: "sod",
+  sbu: "Co(Im)4 tetrahedral node",
+  sbu_type: "Mononuclear tetrahedral",
+  interpenetration: 0,
+  pore_size_A: 3.4,
+  pore_volume_cc_g: 0.621,
+  bet_m2_g: 1520,
+  density_g_cc: 0.989,
+  metals: ["Co"],
+  ligands: [
+    { name: "mIM", fullname: "2-methylimidazolate", smiles: "Cc1ncc[nH]1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Electrocatalysis (OER, HER)", status: "demonstrated" },
+    { name: "CO₂/CH₄ separation", status: "demonstrated" },
+    { name: "Precursor for Co₃O₄ hollow polyhedra", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 273, P_bar: 1, uptake: 25.0, unit: "cm³/g" }
+  ],
+  description: "ZIF-67 is the Co²⁺ analogue of ZIF-8, isostructural and isoreticular in the sod topology. Its purple colour results from d-d transitions of Co²⁺. It has attracted enormous interest as a sacrificial template for derived cobalt oxide electrocatalysts (hollow Co₃O₄ polyhedra for OER) and as a CO₂ separation membrane material.",
+  references: [
+    { primary: true,  authors: "Banerjee, R. et al.", year: 2008, title: "High-Throughput Synthesis of Zeolitic Imidazolate Frameworks and Application to CO2 Capture", journal: "Science", volume: "319", pages: "939–943", doi: "10.1126/science.1152516" },
+    { primary: false, authors: "Hu, J. et al.", year: 2014, title: "ZIF-67-Derived Co3O4 Hollow Polyhedra as High-Performance Anodes for Lithium-Ion Batteries", journal: "ACS Appl. Mater. Interfaces", volume: "6", pages: "19077–19083", doi: "10.1021/am504513y" }
+  ],
+  category: "ZIF / Zeolitic Imidazolate Framework"
+},
+{
+  id: "SIFSIX-3-Ni",
+  name: "SIFSIX-3-Ni",
+  aliases: ["NbOFFIVE-1-Ni","Ni(pyz)2SiF6"],
+  formula: "[Ni(pyz)2SiF6]n",
+  formula_clean: "[Ni(pyrazine)2SiF6]n",
+  year: 2015,
+  group: "Eddaoudi (KAUST)",
+  crystal_system: "Tetragonal",
+  space_group: "P4/mmm",
+  a: 6.929, b: 6.929, c: 7.902,
+  topology: "sql",
+  sbu: "Ni(pyz)4 square planar node + SiF6²⁻ pillars",
+  sbu_type: "Pillared square net",
+  interpenetration: 0,
+  pore_size_A: 3.84,
+  pore_volume_cc_g: 0.19,
+  bet_m2_g: 298,
+  density_g_cc: 1.81,
+  metals: ["Ni"],
+  ligands: [
+    { name: "pyz", fullname: "pyrazine", smiles: "c1cnccn1" },
+    { name: "SiF6²⁻", fullname: "hexafluorosilicate", smiles: "F[Si-2](F)(F)(F)(F)F" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Ultradilute CO₂ capture (400 ppm)", status: "demonstrated" },
+    { name: "CO₂/N₂ separation", status: "demonstrated" },
+    { name: "CO₂/H₂ separation", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 0.001, uptake: 1.24, unit: "mmol/g" },
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 2.53, unit: "mmol/g" }
+  ],
+  description: "SIFSIX-3-Ni features a pillared-square-net topology where SiF6²⁻ pillar anions between Ni(pyrazine)4 layers create uniform pore channels (3.84 Å). The fluorine atoms line the pores and provide strong electrostatic CO₂ binding. It captures CO₂ from flue gas and even directly from air at 400 ppm concentration with unprecedented selectivity over N₂.",
+  references: [
+    { primary: true,  authors: "Shekhah, O. et al.", year: 2014, title: "Made-to-order metal-organic frameworks for trace carbon dioxide removal and air capture", journal: "Nat. Commun.", volume: "5", pages: "4228", doi: "10.1038/ncomms5228" },
+    { primary: false, authors: "Cadiau, A. et al.", year: 2016, title: "Designed CO2-selective metal-organic framework-based porous polymer networks", journal: "Science", volume: "356", pages: "731–735", doi: "10.1126/science.aam8460" }
+  ],
+  category: "SIFSIX / Fluorinated MOF"
+},
+{
+  id: "MIL-125",
+  name: "MIL-125",
+  aliases: ["Ti-BDC","[Ti8O8(OH)4(BDC)6]"],
+  formula: "[Ti8O8(OH)4(BDC)6]n",
+  formula_clean: "[Ti8O8(OH)4(C8H4O4)6]n",
+  year: 2009,
+  group: "Férey / Serre (Versailles)",
+  crystal_system: "Tetragonal",
+  space_group: "I4/mmm",
+  a: 18.674, b: 18.674, c: 18.143,
+  topology: "scu",
+  sbu: "Ti8O8(OH)4 cyclic octameric cluster",
+  sbu_type: "Octanuclear Ti cluster",
+  interpenetration: 0,
+  pore_size_A: 6.1,
+  pore_volume_cc_g: 0.62,
+  bet_m2_g: 1550,
+  density_g_cc: 0.73,
+  metals: ["Ti"],
+  ligands: [
+    { name: "BDC", fullname: "1,4-benzenedicarboxylate", smiles: "OC(=O)c1ccc(cc1)C(O)=O" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Photocatalysis (H₂ evolution, CO₂ reduction)", status: "demonstrated" },
+    { name: "Oxidation catalysis", status: "demonstrated" },
+    { name: "Photoredox sensing", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 36.0, unit: "cm³/g" },
+    { gas: "H₂", T_K: 77, P_bar: 1, uptake: 1.05, unit: "wt%" }
+  ],
+  description: "MIL-125 is the first Ti-based MOF with demonstrated photoredox activity. The Ti8O8(OH)4 oxo-cluster SBU is unique — eight Ti centres form a ring bridged by μ2-oxo and μ2-hydroxo groups. Under UV irradiation, Ti⁴⁺ is reduced to Ti³⁺, enabling photocatalytic alcohol oxidation and H₂ evolution. NH2-MIL-125 extends activity into visible light.",
+  references: [
+    { primary: true,  authors: "Dan-Hardi, M. et al.", year: 2009, title: "A New Photoactive Crystalline Highly Porous Titanium(IV) Dicarboxylate", journal: "J. Am. Chem. Soc.", volume: "131", pages: "10857–10859", doi: "10.1021/ja903726m" },
+    { primary: false, authors: "Fu, Y. et al.", year: 2012, title: "An Amine-Functionalized Titanium Metal-Organic Framework Photocatalyst with Visible-Light-Induced Activity for CO2 Reduction", journal: "Angew. Chem. Int. Ed.", volume: "51", pages: "3364–3367", doi: "10.1002/anie.201108357" }
+  ],
+  category: "Ti-carboxylate / Photocatalytic"
+},
+{
+  id: "IRMOF-3",
+  name: "IRMOF-3",
+  aliases: ["MOF-NHBT","Zn4O(NH2-BDC)3"],
+  formula: "[Zn4O(NH2-BDC)3]n",
+  formula_clean: "[Zn4O(2-aminoterephthalate)3]n",
+  year: 2002,
+  group: "Yaghi (UCLA)",
+  crystal_system: "Cubic",
+  space_group: "Fm3̄m",
+  a: 25.747, b: 25.747, c: 25.747,
+  topology: "pcu",
+  sbu: "Zn4O(CO2)6 octahedral cluster",
+  sbu_type: "Paddlewheel-related / Zn4O cluster",
+  interpenetration: 0,
+  pore_size_A: 11.8,
+  pore_volume_cc_g: 0.98,
+  bet_m2_g: 2446,
+  density_g_cc: 0.62,
+  metals: ["Zn"],
+  ligands: [
+    { name: "NH2-BDC", fullname: "2-amino-1,4-benzenedicarboxylate", smiles: "Nc1cc(C(O)=O)ccc1C(O)=O" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Post-synthetic modification (PSM) platform", status: "demonstrated" },
+    { name: "Catalysis (amine-functionalised)", status: "demonstrated" },
+    { name: "Sensing (fluorescent)", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 24.0, unit: "cm³/g" }
+  ],
+  description: "IRMOF-3 is the amine-functionalised analogue of MOF-5 (IRMOF-1), demonstrating the isoreticular approach to functional pore engineering. The free amino groups on the BDC linker provide reactive handles for post-synthetic covalent modification. This established PSM as a central strategy for MOF chemistry — converting IRMOF-3 into a library of functional derivatives via simple condensation reactions.",
+  references: [
+    { primary: true,  authors: "Eddaoudi, M. et al.", year: 2002, title: "Systematic Design of Pore Size and Functionality in Isoreticular MOFs and Their Application in Methane Storage", journal: "Science", volume: "295", pages: "469–472", doi: "10.1126/science.1067208" },
+    { primary: false, authors: "Wang, Z.; Cohen, S. M.", year: 2009, title: "Postsynthetic modification of metal–organic frameworks", journal: "Chem. Soc. Rev.", volume: "38", pages: "1315–1329", doi: "10.1039/b802278g" }
+  ],
+  category: "Zn-carboxylate / IRMOF series"
+},
+{
+  id: "BUT-12",
+  name: "BUT-12",
+  aliases: ["Cr-soc-MOF","[Cr3O(ABTC)1.5]"],
+  formula: "[Cr3O(ABTC)1.5(H2O)3]n",
+  formula_clean: "[Cr3O(ABTC)1.5]n",
+  year: 2017,
+  group: "Bu / Xu (Beijing Univ. of Technology)",
+  crystal_system: "Cubic",
+  space_group: "Im3̄m",
+  a: 20.64, b: 20.64, c: 20.64,
+  topology: "soc",
+  sbu: "Cr3O(CO2)6 trimeric cluster",
+  sbu_type: "Trinuclear μ3-oxo cluster",
+  interpenetration: 0,
+  pore_size_A: 9.0,
+  pore_volume_cc_g: 0.92,
+  bet_m2_g: 2820,
+  density_g_cc: 0.73,
+  metals: ["Cr"],
+  ligands: [
+    { name: "ABTC", fullname: "3,3',5,5'-azobenzenetetracarboxylate", smiles: "OC(=O)c1cc(C(O)=O)cc(/N=N/c2cc(C(O)=O)cc(C(O)=O)c2)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "CO₂ capture", status: "demonstrated" },
+    { name: "Photoswitchable gas sorption (azo)", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 58.0, unit: "cm³/g" },
+    { gas: "N₂", T_K: 77, P_bar: 1, uptake: 695, unit: "cm³/g" }
+  ],
+  description: "BUT-12 combines Cr3O trimeric clusters with azobenzenetetracarboxylate linkers in an soc topology. The azobenzene moiety undergoes trans-to-cis photoisomerisation under UV light, enabling light-controlled modulation of gas sorption capacity. This makes BUT-12 a photoswitchable MOF with reversible on/off CO₂ sorption control.",
+  references: [
+    { primary: true,  authors: "Luo, X.-Z. et al.", year: 2017, title: "A microporous hydrogen-bonded organic framework: exceptional stability and highly selective adsorption of water over methanol", journal: "J. Am. Chem. Soc.", volume: "139", pages: "10961–10965", doi: "10.1021/jacs.7b04497" }
+  ],
+  category: "Photoswitchable MOF"
+},
+{
+  id: "Zn-ZIF-90",
+  name: "ZIF-90",
+  aliases: ["[Zn(ICA)2]"],
+  formula: "[Zn(imidazolate-2-carboxaldehyde)2]n",
+  formula_clean: "[Zn(ICA)2]n",
+  year: 2008,
+  group: "Yaghi (UCLA)",
+  crystal_system: "Cubic",
+  space_group: "I4̄3m",
+  a: 17.268, b: 17.268, c: 17.268,
+  topology: "sod",
+  sbu: "Zn(Im)4 tetrahedral node",
+  sbu_type: "Mononuclear tetrahedral",
+  interpenetration: 0,
+  pore_size_A: 3.5,
+  pore_volume_cc_g: 0.615,
+  bet_m2_g: 1270,
+  density_g_cc: 1.05,
+  metals: ["Zn"],
+  ligands: [
+    { name: "ICA", fullname: "imidazolate-2-carboxaldehyde", smiles: "O=Cc1ncc[nH]1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "Mixed-matrix membrane (polymer blending)", status: "demonstrated" },
+    { name: "Post-synthetic imine condensation", status: "demonstrated" },
+    { name: "CO₂/CH₄ separation", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 273, P_bar: 1, uptake: 24.0, unit: "cm³/g" }
+  ],
+  description: "ZIF-90 is the aldehyde-functionalised analogue of ZIF-8 in the sodalite topology. The aldehyde groups on the imidazolate ring project into the pore space and can be used for covalent post-synthetic modification (e.g. imine condensation with amino compounds). ZIF-90 was one of the first ZIFs used to fabricate mixed-matrix membranes with commercial polymers for CO₂/CH₄ separation.",
+  references: [
+    { primary: true,  authors: "Morris, W. et al.", year: 2008, title: "A Combined Experimental–Computational Study on the Effect of Topology on Carbon Dioxide Adsorption in Zeolitic Imidazolate Frameworks", journal: "J. Phys. Chem. C", volume: "112", pages: "9492–9494", doi: "10.1021/jp801067r" },
+    { primary: false, authors: "Venna, S. R.; Carreon, M. A.", year: 2010, title: "Highly Permeable Zeolite Imidazolate Framework-8 Membranes for CO2/CH4 Separation", journal: "J. Am. Chem. Soc.", volume: "132", pages: "76–78", doi: "10.1021/ja909263x" }
+  ],
+  category: "ZIF / Functionalised"
+},
+{
+  id: "Mg-MOF-74",
+  name: "Mg-MOF-74",
+  aliases: ["CPO-27-Mg","[Mg2(DOBDC)]","Mg-CPO-27"],
+  formula: "[Mg2(C8H2O6)]n · H2O",
+  formula_clean: "[Mg2(DOBDC)]n",
+  year: 2008,
+  group: "Rosi / Long (Berkeley)",
+  crystal_system: "Trigonal",
+  space_group: "R3̄",
+  a: 26.117, b: 26.117, c: 6.858,
+  topology: "etb",
+  sbu: "Mg2(CO2)2(OH) rod SBU (helical)",
+  sbu_type: "Infinite rod / helical chain",
+  interpenetration: 0,
+  pore_size_A: 11.0,
+  pore_volume_cc_g: 0.57,
+  bet_m2_g: 1495,
+  density_g_cc: 0.89,
+  metals: ["Mg"],
+  ligands: [
+    { name: "DOBDC", fullname: "2,5-dioxido-1,4-benzenedicarboxylate (DOT)", smiles: "OC(=O)c1cc(C(O)=O)c(O)c(O)c1" }
+  ],
+  cod_id: null,
+  cif_local: null,
+  applications: [
+    { name: "CO₂ capture (post-combustion)", status: "demonstrated" },
+    { name: "CO₂/CH₄ separation", status: "demonstrated" },
+    { name: "O₂ / NO storage", status: "demonstrated" },
+    { name: "Ethylene/ethane separation", status: "demonstrated" }
+  ],
+  sorption: [
+    { gas: "CO₂", T_K: 298, P_bar: 1, uptake: 8.04, unit: "mmol/g" },
+    { gas: "CH₄", T_K: 298, P_bar: 1, uptake: 0.77, unit: "mmol/g" }
+  ],
+  description: "Mg-MOF-74 holds the highest CO₂ uptake per gram under relevant conditions (1 bar, 298 K) of any MOF — 8.04 mmol/g, exceeding zeolite 13X. The Mg²⁺ open coordination sites provide the strongest CO₂ binding enthalpy in the M-MOF-74 series (−47 kJ/mol). Pilot-scale flue gas separation tests have been conducted, and it is considered the benchmark for physisorptive CO₂ capture.",
+  references: [
+    { primary: true,  authors: "Queen, W. L. et al.", year: 2014, title: "Comprehensive study of carbon dioxide adsorption in the metal–organic frameworks M2(dobdc)", journal: "Chem. Sci.", volume: "5", pages: "4569–4581", doi: "10.1039/c4sc02064b" },
+    { primary: false, authors: "Mason, J. A. et al.", year: 2011, title: "Evaluating metal–organic frameworks for post-combustion carbon dioxide capture via temperature swing adsorption", journal: "Energy Environ. Sci.", volume: "4", pages: "3030–3040", doi: "10.1039/c1ee01720a" }
+  ],
+  category: "M-MOF-74 series"
+}
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let filters = {
+  text: '',
+  metals: new Set(),
+  ligands: new Set(),
+  topologies: new Set(),
+  apps: new Set(),
+  sbus: new Set(),
+  interpenetration: '',
+  yearFrom: 1989,
+  yearTo: 2024
+};
+let sortMode = 'name';
+let viewMode = 'grid';
+let currentMOF = null;
+let viewer3d = null;
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  buildFilterClouds();
+  updateStats();
+  renderCards();
+  initTopologyCanvas();
+  setupListeners();
+});
+
+function setupListeners() {
+  document.getElementById('main-search').addEventListener('input', e => {
+    filters.text = e.target.value.toLowerCase();
+    renderCards();
+  });
+  document.getElementById('rail-search').addEventListener('input', e => {
+    filters.text = e.target.value.toLowerCase();
+    document.getElementById('main-search').value = e.target.value;
+    renderCards();
+  });
+  document.getElementById('sort-select').addEventListener('change', e => {
+    sortMode = e.target.value;
+    renderCards();
+  });
+  document.getElementById('interp-select').addEventListener('change', e => {
+    filters.interpenetration = e.target.value;
+    renderCards();
+  });
+  document.getElementById('year-from').addEventListener('input', e => {
+    filters.yearFrom = +e.target.value;
+    document.getElementById('year-from-val').textContent = e.target.value;
+    renderCards();
+  });
+  document.getElementById('year-to').addEventListener('input', e => {
+    filters.yearTo = +e.target.value;
+    document.getElementById('year-to-val').textContent = e.target.value;
+    renderCards();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILTER CLOUD BUILDING
+// ═══════════════════════════════════════════════════════════════
+function buildFilterClouds() {
+  const metals = new Set(), ligands = new Set(), topologies = new Set(), apps = new Set(), sbus = new Set();
+  MOF_DATA.forEach(m => {
+    m.metals.forEach(x => metals.add(x));
+    m.ligands.forEach(x => ligands.add(x.name));
+    if (m.topology) topologies.add(m.topology);
+    m.applications.forEach(a => apps.add(a.name.replace(/[₀-₉]/g, s => String.fromCharCode(s.charCodeAt(0) - 8272 + 48))));
+    if (m.sbu_type) sbus.add(m.sbu_type.split('/')[0].trim().split('(')[0].trim());
+  });
+
+  populateCloud('metal-cloud', [...metals].sort(), 'metal');
+  populateCloud('ligand-cloud', [...ligands].sort(), 'ligand');
+  populateCloud('topology-cloud', [...topologies].sort(), 'topology');
+  populateCloud('app-cloud', [...apps].sort(), 'app');
+  populateCloud('sbu-cloud', [...new Set([...sbus])].sort(), 'sbu');
+}
+
+function populateCloud(containerId, items, type) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  items.forEach(item => {
+    const pill = document.createElement('button');
+    pill.className = 'tag-pill';
+    pill.textContent = item;
+    pill.dataset.value = item;
+    pill.dataset.type = type;
+    pill.addEventListener('click', () => toggleFilter(type, item, pill));
+    el.appendChild(pill);
+  });
+}
+
+function toggleFilter(type, value, el) {
+  const setMap = {
+    metal: filters.metals, ligand: filters.ligands,
+    topology: filters.topologies, app: filters.apps, sbu: filters.sbus
+  };
+  const classMap = {
+    metal: 'active-metal', ligand: 'active-ligand',
+    topology: 'active-topology', app: 'active-app', sbu: 'active-app'
+  };
+  const s = setMap[type];
+  if (s.has(value)) {
+    s.delete(value);
+    el.className = 'tag-pill';
+  } else {
+    s.add(value);
+    el.className = `tag-pill ${classMap[type]}`;
+  }
+  renderCards();
+  updateChips();
+}
+
+function updateChips() {
+  const container = document.getElementById('active-chips');
+  container.innerHTML = '';
+  const addChip = (label, onRemove) => {
+    const chip = document.createElement('div');
+    chip.className = 'active-chip';
+    chip.innerHTML = `${label} <span class="chip-x">✕</span>`;
+    chip.addEventListener('click', onRemove);
+    container.appendChild(chip);
+  };
+  filters.metals.forEach(v => addChip(`Metal: ${v}`, () => removeFilter('metal', v)));
+  filters.ligands.forEach(v => addChip(`Ligand: ${v}`, () => removeFilter('ligand', v)));
+  filters.topologies.forEach(v => addChip(`Topology: ${v}`, () => removeFilter('topology', v)));
+  filters.apps.forEach(v => addChip(`App: ${v.substring(0,20)}…`, () => removeFilter('app', v)));
+  filters.sbus.forEach(v => addChip(`SBU: ${v}`, () => removeFilter('sbu', v)));
+  if (filters.interpenetration) addChip(`Interp.: ${filters.interpenetration}`, () => { filters.interpenetration=''; document.getElementById('interp-select').value=''; renderCards(); updateChips(); });
+}
+
+function removeFilter(type, value) {
+  const setMap = { metal: filters.metals, ligand: filters.ligands, topology: filters.topologies, app: filters.apps, sbu: filters.sbus };
+  setMap[type].delete(value);
+  // update pill UI
+  document.querySelectorAll(`.tag-pill[data-type="${type}"][data-value="${value}"]`).forEach(p => p.className = 'tag-pill');
+  renderCards();
+  updateChips();
+}
+
+function clearFilters() {
+  filters = { text:'', metals:new Set(), ligands:new Set(), topologies:new Set(), apps:new Set(), sbus:new Set(), interpenetration:'', yearFrom:1989, yearTo:2024 };
+  document.getElementById('main-search').value = '';
+  document.getElementById('rail-search').value = '';
+  document.getElementById('interp-select').value = '';
+  document.getElementById('year-from').value = '1989';
+  document.getElementById('year-to').value = '2024';
+  document.getElementById('year-from-val').textContent = '1989';
+  document.getElementById('year-to-val').textContent = '2024';
+  document.querySelectorAll('.tag-pill').forEach(p => p.className = 'tag-pill');
+  renderCards();
+  updateChips();
+}
+
+function toggleSection(id) {
+  const body = document.getElementById(`body-${id}`);
+  const chev = document.getElementById(`chev-${id}`);
+  body.classList.toggle('collapsed');
+  chev.classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILTERING + SORTING
+// ═══════════════════════════════════════════════════════════════
+function getFiltered() {
+  return MOF_DATA.filter(m => {
+    if (filters.text) {
+      const t = filters.text;
+      const searchable = [m.name, m.formula, m.formula_clean, ...m.aliases,
+        m.topology, m.sbu, m.group, m.category, ...m.metals,
+        ...m.ligands.map(l => l.name + ' ' + l.fullname),
+        ...m.applications.map(a => a.name)
+      ].join(' ').toLowerCase();
+      if (!searchable.includes(t)) return false;
+    }
+    if (filters.metals.size > 0) {
+      if (!m.metals.some(mt => filters.metals.has(mt))) return false;
+    }
+    if (filters.ligands.size > 0) {
+      if (!m.ligands.some(l => filters.ligands.has(l.name))) return false;
+    }
+    if (filters.topologies.size > 0) {
+      if (!filters.topologies.has(m.topology)) return false;
+    }
+    if (filters.apps.size > 0) {
+      const mApps = m.applications.map(a => a.name.replace(/[₀-₉]/g, s => String.fromCharCode(s.charCodeAt(0)-8272+48)));
+      if (!mApps.some(a => filters.apps.has(a))) return false;
+    }
+    if (filters.interpenetration) {
+      const ip = filters.interpenetration;
+      if (ip === '4+' && m.interpenetration < 4) return false;
+      if (ip !== '4+' && m.interpenetration !== +ip) return false;
+    }
+    if (m.year < filters.yearFrom || m.year > filters.yearTo) return false;
+    return true;
+  });
+}
+
+function getSorted(arr) {
+  return [...arr].sort((a,b) => {
+    switch(sortMode) {
+      case 'name': return a.name.localeCompare(b.name);
+      case 'year-asc': return a.year - b.year;
+      case 'year-desc': return b.year - a.year;
+      case 'bet-desc': return (b.bet_m2_g||0) - (a.bet_m2_g||0);
+      case 'pore-desc': return (b.pore_size_A||0) - (a.pore_size_A||0);
+      default: return 0;
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER CARDS
+// ═══════════════════════════════════════════════════════════════
+function renderCards() {
+  const grid = document.getElementById('card-grid');
+  const filtered = getSorted(getFiltered());
+  const total = MOF_DATA.length;
+
+  document.getElementById('results-count').innerHTML =
+    `Showing <strong>${filtered.length}</strong> <span class="cyan">of ${total}</span> frameworks`;
+
+  grid.innerHTML = '';
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="no-results">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        <line x1="8" y1="11" x2="14" y2="11"/>
+      </svg>
+      <h3>No frameworks found</h3>
+      <p>Try adjusting your search criteria or clearing filters.</p>
+    </div>`;
+    return;
+  }
+
+  filtered.forEach((mof, i) => {
+    const card = document.createElement('div');
+    card.className = 'mof-card';
+    card.style.animationDelay = `${Math.min(i * 0.03, 0.4)}s`;
+    card.innerHTML = buildCardHTML(mof);
+    card.addEventListener('click', () => openDetail(mof));
+    grid.appendChild(card);
+  });
+}
+
+function buildCardHTML(mof) {
+  const metalTags = mof.metals.map(m => `<span class="card-tag tag-metal">${m}</span>`).join('');
+  const ligandTags = mof.ligands.map(l => `<span class="card-tag tag-ligand">${l.name}</span>`).join('');
+  const topTag = mof.topology ? `<span class="card-tag tag-topology">${mof.topology}</span>` : '';
+  const sbuTag = `<span class="card-tag tag-sbu">${mof.sbu_type.split('/')[0].trim().split('(')[0].trim()}</span>`;
+  const appTags = mof.applications.slice(0,2).map(a => `<span class="card-tag tag-app">${a.name.replace(/[₂₃₄]/g, s=>s==='₂'?'₂':s==='₃'?'₃':'₄')}</span>`).join('');
+
+  const bet = mof.bet_m2_g ? mof.bet_m2_g.toLocaleString() : '—';
+  const pore = mof.pore_size_A ? mof.pore_size_A.toFixed(1) : '—';
+  const pv = mof.pore_volume_cc_g ? mof.pore_volume_cc_g.toFixed(2) : '—';
+
+  return `
+    <div class="card-header">
+      <div>
+        <div class="card-name">${mof.name}</div>
+        ${mof.aliases.length > 0 ? `<div class="card-iupac">${mof.aliases[0]}</div>` : ''}
+      </div>
+      <span class="card-year">${mof.year}</span>
+    </div>
+    <div class="card-formula">${mof.formula_clean}</div>
+    <div class="card-tags">${metalTags}${ligandTags}${topTag}${sbuTag}</div>
+    <div class="card-tags">${appTags}</div>
+    <div class="card-metrics">
+      <div class="metric-box">
+        <div class="metric-value">${bet}</div>
+        <div class="metric-label">BET m²/g</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">${pore} Å</div>
+        <div class="metric-label">Pore size</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-value">${mof.interpenetration === 0 ? 'None' : mof.interpenetration + '×'}</div>
+        <div class="metric-label">Interpenetr.</div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <div class="card-group">Group: <strong>${mof.group.split('(')[0].trim()}</strong></div>
+      <div class="card-actions">
+        <button class="card-btn primary" onclick="event.stopPropagation(); openDetail(MOF_DATA.find(m=>m.id==='${mof.id}'))">Details →</button>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════════════════
+function updateStats() {
+  const metals = new Set(), tops = new Set();
+  MOF_DATA.forEach(m => { m.metals.forEach(x => metals.add(x)); if(m.topology) tops.add(m.topology); });
+  document.getElementById('stat-total').textContent = MOF_DATA.length;
+  document.getElementById('stat-metals').textContent = metals.size;
+  document.getElementById('stat-topologies').textContent = tops.size;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VIEW TOGGLE
+// ═══════════════════════════════════════════════════════════════
+function setView(mode) {
+  viewMode = mode;
+  const grid = document.getElementById('card-grid');
+  grid.classList.toggle('list-view', mode === 'list');
+  document.getElementById('btn-grid').classList.toggle('active', mode === 'grid');
+  document.getElementById('btn-list').classList.toggle('active', mode === 'list');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DETAIL PANEL
+// ═══════════════════════════════════════════════════════════════
+function openDetail(mof) {
+  currentMOF = mof;
+  document.getElementById('detail-breadcrumb-name').textContent = mof.name;
+  document.getElementById('detail-content').innerHTML = buildDetailHTML(mof);
+  document.getElementById('detail-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Init 3D viewer after panel is open
+  setTimeout(() => init3DViewer(mof), 120);
+
+  // Render ligand SMILES images via CDK depict
+  mof.ligands.forEach(l => {
+    const imgWrap = document.getElementById(`lig-img-${l.name}`);
+    if (imgWrap) {
+      const img = document.createElement('img');
+      img.src = `https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(l.smiles)}/image?width=160&height=100&format=png`;
+      img.alt = l.name;
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100px';
+      img.onerror = () => {
+        // Fallback to CDK depict
+        img.src = `https://www.simolecule.com/cdkdepict/depict/bot/svg?smi=${encodeURIComponent(l.smiles)}&w=160&h=100&abbr=on&hdisp=bridgehead&showtitle=false`;
+        img.onerror = () => { imgWrap.innerHTML = `<span style="font-size:0.7rem;color:var(--text-muted);padding:8px;">Preview unavailable</span>`; };
+      };
+      imgWrap.appendChild(img);
+    }
+  });
+}
+
+function closeDetail(e) {
+  if (e.target === document.getElementById('detail-overlay')) closeDetailBtn();
+}
+
+function closeDetailBtn() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  if (viewer3d) { try { viewer3d = null; } catch(e){} }
+  document.getElementById('viewer-3d').innerHTML = '';
+}
+
+function buildDetailHTML(mof) {
+  // Applications
+  const appHTML = mof.applications.map(a =>
+    `<div class="app-pill ${a.status}">
+      <div class="app-dot ${a.status === 'demonstrated' ? 'demo' : 'prop'}"></div>
+      ${a.name}
+    </div>`
+  ).join('');
+
+  // Sorption table
+  const maxUptake = Math.max(...mof.sorption.map(s => s.uptake), 1);
+  const sorpHTML = mof.sorption.length ? `
+    <table class="sorption-table">
+      <thead><tr><th>Gas</th><th>T (K)</th><th>P (bar)</th><th>Uptake</th><th>Progress</th></tr></thead>
+      <tbody>${mof.sorption.map(s => `
+        <tr>
+          <td style="color:var(--text-primary);font-weight:500">${s.gas}</td>
+          <td class="mono">${s.T_K}</td>
+          <td class="mono">${s.P_bar}</td>
+          <td class="mono">${s.uptake} ${s.unit}</td>
+          <td class="sorption-bar-cell">
+            <div class="sorption-bar-wrap">
+              <div class="sorption-bar"><div class="sorption-bar-fill" style="width:${Math.round((s.uptake/maxUptake)*100)}%"></div></div>
+            </div>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<p style="color:var(--text-muted);font-size:0.82rem;">No sorption data in database.</p>';
+
+  // References
+  const refHTML = mof.references.map(r => `
+    <div class="ref-item">
+      <div class="ref-title">${r.title}</div>
+      <div class="ref-meta">
+        <span>${r.authors}</span>
+        <span class="ref-journal">${r.journal}</span>
+        <span>${r.year}</span>
+        ${r.volume ? `<span>Vol. ${r.volume}${r.pages ? ', pp. '+r.pages : ''}</span>` : ''}
+        ${r.primary ? '<span class="ref-primary-badge">Primary</span>' : ''}
+      </div>
+      <a class="ref-doi" href="https://doi.org/${r.doi}" target="_blank" rel="noopener">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M4.5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6.5M7 1h3m0 0v3m0-3L4.5 6.5"/>
+        </svg>
+        doi:${r.doi}
+      </a>
+    </div>`).join('');
+
+  // Ligands
+  const ligHTML = mof.ligands.map(l => `
+    <div class="ligand-card">
+      <div class="ligand-name">${l.name}</div>
+      <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">${l.fullname}</div>
+      <div class="ligand-smiles">${l.smiles}</div>
+      <div class="ligand-img-wrap" id="lig-img-${l.name}"></div>
+    </div>`).join('');
+
+  return `
+    <div class="detail-hero">
+      <div class="detail-name">${mof.name}</div>
+      ${mof.aliases.length > 0 ? `<div class="detail-aliases">Also known as: ${mof.aliases.join(' · ')}</div>` : ''}
+      <div class="detail-formula-row">
+        <div class="detail-formula">${mof.formula_clean}</div>
+        <span class="detail-badge tag-metal">${mof.metals.join(', ')}</span>
+        <span class="detail-badge tag-topology">${mof.topology || 'unknown'}</span>
+        <span class="detail-badge card-tag" style="background:rgba(240,160,48,0.1);color:var(--amber);border:1px solid rgba(240,160,48,0.3)">${mof.year}</span>
+      </div>
+      <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.6;margin-bottom:4px;">${mof.description}</p>
+    </div>
+
+    <div class="detail-body">
+      <div class="detail-viewer-row">
+        <!-- 3D VIEWER -->
+        <div>
+          <div class="detail-section-title">3D Structure</div>
+          <div class="viewer-container">
+            <div id="viewer-3d"></div>
+            <div class="viewer-loading" id="viewer-loading">
+              <div class="spinner"></div>
+              <span>Loading structure…</span>
+            </div>
+            <div class="viewer-controls">
+              <button class="viewer-btn" onclick="set3DStyle('stick')">Stick</button>
+              <button class="viewer-btn" onclick="set3DStyle('sphere')">Sphere</button>
+              <button class="viewer-btn" onclick="set3DStyle('line')">Line</button>
+              <button class="viewer-btn" onclick="toggle3DSpin()">Spin</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUICK FACTS -->
+        <div>
+          <div class="detail-section-title">Crystallographic Data</div>
+          <div class="facts-grid">
+            <div class="fact-item"><div class="fact-label">Crystal System</div><div class="fact-value">${mof.crystal_system || '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Space Group</div><div class="fact-value mono">${mof.space_group || '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Topology</div><div class="fact-value topology">${mof.topology || '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Interpenetration</div><div class="fact-value amber">${mof.interpenetration === 0 ? 'None' : mof.interpenetration + '-fold'}</div></div>
+            <div class="fact-item"><div class="fact-label">SBU</div><div class="fact-value" style="font-size:0.78rem">${mof.sbu}</div></div>
+            <div class="fact-item"><div class="fact-label">SBU Type</div><div class="fact-value" style="font-size:0.78rem">${mof.sbu_type}</div></div>
+            <div class="fact-item"><div class="fact-label">BET Surface Area</div><div class="fact-value cyan">${mof.bet_m2_g ? mof.bet_m2_g.toLocaleString() + ' m²/g' : '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Pore Volume</div><div class="fact-value cyan">${mof.pore_volume_cc_g ? mof.pore_volume_cc_g + ' cc/g' : '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Pore Size</div><div class="fact-value">${mof.pore_size_A ? mof.pore_size_A + ' Å' : '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Density</div><div class="fact-value mono">${mof.density_g_cc ? mof.density_g_cc + ' g/cc' : '—'}</div></div>
+            <div class="fact-item"><div class="fact-label">Discovery Group</div><div class="fact-value" style="font-size:0.78rem">${mof.group}</div></div>
+            <div class="fact-item"><div class="fact-label">Category</div><div class="fact-value" style="font-size:0.78rem">${mof.category}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIGANDS -->
+      <div class="detail-section">
+        <div class="detail-section-title">Ligands / Linkers</div>
+        <div class="ligand-section">${ligHTML}</div>
+      </div>
+
+      <!-- APPLICATIONS -->
+      <div class="detail-section">
+        <div class="detail-section-title">Applications</div>
+        <div style="margin-bottom:8px;display:flex;gap:16px;font-size:0.72rem;color:var(--text-muted)">
+          <span><span style="color:var(--cyan)">●</span> Demonstrated</span>
+          <span><span style="color:var(--amber)">●</span> Proposed</span>
+        </div>
+        <div class="apps-grid">${appHTML}</div>
+      </div>
+
+      <!-- GAS SORPTION -->
+      <div class="detail-section">
+        <div class="detail-section-title">Gas Sorption Data</div>
+        ${sorpHTML}
+      </div>
+
+      <!-- REFERENCES -->
+      <div class="detail-section">
+        <div class="detail-section-title">Literature References</div>
+        <div class="ref-list">${refHTML}</div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  3D VIEWER
+// ═══════════════════════════════════════════════════════════════
+let spinOn = false;
+
+function init3DViewer(mof) {
+  const container = document.getElementById('viewer-3d');
+  const loading = document.getElementById('viewer-loading');
+  container.innerHTML = '';
+
+  // Try to load CIF: 1) local /cif/ folder, 2) COD by cod_id, 3) RCSB PDB, 4) built-in XYZ
+  const tryLoad = (url, format) => {
+    return fetch(url)
+      .then(r => { if (!r.ok) throw new Error('not found'); return r.text(); })
+      .then(data => {
+        loading.style.display = 'none';
+        render3D(container, data, format);
+        return true;
+      });
+  };
+
+  const localPath = `cif/${mof.id.replace(/[^a-zA-Z0-9-_]/g,'_')}.cif`;
+  const codUrl = mof.cod_id ? `https://www.crystallography.net/cod/${mof.cod_id}.cif` : null;
+
+  const chain = mof.cod_id
+    ? tryLoad(localPath, 'cif').catch(() => tryLoad(codUrl, 'cif'))
+    : tryLoad(localPath, 'cif');
+
+  chain.catch(() => {
+    // Fallback: generate a symbolic representation
+    loading.style.display = 'none';
+    renderSymbolic3D(container, mof);
+  });
+}
+
+function render3D(container, cifData, format) {
+  try {
+    const config = { backgroundColor: '0x050B18', antialias: true };
+    viewer3d = $3Dmol.createViewer(container, config);
+    viewer3d.addModel(cifData, format, {normalizeSticks: true});
+    viewer3d.setStyle({}, {stick: {radius: 0.12, colorscheme: 'Jmol'}, sphere: {scale: 0.25, colorscheme: 'Jmol'}});
+    viewer3d.addUnitCell();
+    viewer3d.zoomTo();
+    viewer3d.render();
+    viewer3d.spin(false);
+  } catch(e) {
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.8rem;">3Dmol render error</div>';
+  }
+}
+
+function renderSymbolic3D(container, mof) {
+  // Build a simple representative structure using 3Dmol with XYZ coordinates
+  // We generate a representative asymmetric unit for known MOFs
+  const xyzMap = {
+    'MOF-5': buildMOF5XYZ(),
+    'ZIF-8': buildZIF8XYZ(),
+    'HKUST-1': buildHKUST1XYZ(),
+  };
+
+  const xyz = xyzMap[mof.id];
+  if (xyz) {
+    try {
+      const config = { backgroundColor: '0x050B18', antialias: true };
+      viewer3d = $3Dmol.createViewer(container, config);
+      viewer3d.addModel(xyz, 'xyz');
+      viewer3d.setStyle({}, {stick: {radius: 0.15, colorscheme: 'Jmol'}, sphere: {scale: 0.3, colorscheme: 'Jmol'}});
+      viewer3d.zoomTo();
+      viewer3d.render();
+      return;
+    } catch(e) {}
+  }
+
+  // Ultimate fallback: informational placeholder
+  container.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;padding:20px;text-align:center;">
+      <div style="color:var(--text-muted);font-size:0.8rem;line-height:1.6;">
+        <div style="color:var(--cyan);font-family:var(--font-mono);font-size:1.1rem;margin-bottom:8px;">${mof.id}</div>
+        Place a CIF file at<br>
+        <code style="color:var(--text-secondary);background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">cif/${mof.id.replace(/[^a-zA-Z0-9-_]/g,'_')}.cif</code><br>
+        to enable 3D rendering.
+        ${mof.cod_id ? `<br><br>Or add COD ID: <span style="color:var(--cyan)">${mof.cod_id}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function buildMOF5XYZ() {
+  // Zn4O SBU fragment + BDC linker representative atoms
+  return `36
+MOF-5 representative SBU fragment
+Zn  0.000  0.000  0.000
+Zn  4.000  0.000  0.000
+Zn  0.000  4.000  0.000
+Zn  0.000  0.000  4.000
+O   1.000  1.000  1.000
+O   2.000  0.000  0.000
+O   0.000  2.000  0.000
+O   0.000  0.000  2.000
+O  -2.000  0.000  0.000
+O   0.000 -2.000  0.000
+O   0.000  0.000 -2.000
+O   4.000  2.000  0.000
+O   4.000 -2.000  0.000
+C   3.000  2.000  0.000
+C   3.000 -2.000  0.000
+C   2.000  2.000  0.000
+C   2.000 -2.000  0.000
+C   1.500  2.500  0.000
+C   1.500 -2.500  0.000
+C   1.500  3.500  0.000
+C   1.500 -3.500  0.000
+C   0.000  4.000  0.000
+C   0.000 -4.000  0.000
+C  -1.500  3.500  0.000
+C  -1.500 -3.500  0.000
+C  -1.500  2.500  0.000
+C  -1.500 -2.500  0.000
+C  -2.000  2.000  0.000
+C  -2.000 -2.000  0.000
+O  -3.000  2.000  0.000
+O  -3.000 -2.000  0.000
+O   6.000  0.000  0.000
+O   0.000  6.000  0.000
+O   0.000  0.000  6.000
+C   5.000  0.000  0.000
+C   0.000  5.000  0.000`;
+}
+
+function buildZIF8XYZ() {
+  return `13
+ZIF-8 representative Zn-mIM unit
+Zn  0.000  0.000  0.000
+N   2.000  0.000  0.000
+N  -2.000  0.000  0.000
+N   0.000  2.000  0.000
+N   0.000 -2.000  0.000
+C   2.800  1.100  0.000
+C   2.800 -1.100  0.000
+C  -2.800  1.100  0.000
+C  -2.800 -1.100  0.000
+C   3.200  0.000  0.000
+C  -3.200  0.000  0.000
+C   0.000  3.200  0.000
+C   0.000 -3.200  0.000`;
+}
+
+function buildHKUST1XYZ() {
+  return `14
+HKUST-1 Cu2 paddlewheel fragment
+Cu  0.000  0.000  0.000
+Cu  0.000  0.000  2.628
+O   1.900  0.000  0.650
+O  -1.900  0.000  0.650
+O   0.000  1.900  0.650
+O   0.000 -1.900  0.650
+O   1.900  0.000  1.978
+O  -1.900  0.000  1.978
+O   0.000  1.900  1.978
+O   0.000 -1.900  1.978
+C   2.500  0.000  1.314
+C  -2.500  0.000  1.314
+C   0.000  2.500  1.314
+C   0.000 -2.500  1.314`;
+}
+
+function set3DStyle(style) {
+  if (!viewer3d) return;
+  const styles = {
+    stick: {stick: {radius: 0.15, colorscheme: 'Jmol'}, sphere: {scale: 0.28, colorscheme: 'Jmol'}},
+    sphere: {sphere: {colorscheme: 'Jmol'}},
+    line: {line: {colorscheme: 'Jmol'}}
+  };
+  viewer3d.setStyle({}, styles[style] || styles.stick);
+  viewer3d.render();
+}
+
+function toggle3DSpin() {
+  if (!viewer3d) return;
+  spinOn = !spinOn;
+  viewer3d.spin(spinOn ? 'y' : false);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOPOLOGY CANVAS ANIMATION
+// ═══════════════════════════════════════════════════════════════
+function initTopologyCanvas() {
+  const canvas = document.getElementById('topology-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+
+  const nodes = [];
+  const edges = [];
+  const N = 28;
+
+  for (let i = 0; i < N; i++) {
+    nodes.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 2.5 + 1.5,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  function buildEdges() {
+    edges.length = 0;
+    for (let i = 0; i < N; i++) {
+      for (let j = i+1; j < N; j++) {
+        const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 180) edges.push([i, j, dist]);
+      }
+    }
+  }
+
+  let t = 0;
+  function animate() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    t += 0.008;
+    nodes.forEach(n => {
+      n.x += n.vx; n.y += n.vy;
+      if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+      if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+    });
+    buildEdges();
+    edges.forEach(([i,j,d]) => {
+      const alpha = (1 - d/180) * 0.6;
+      ctx.strokeStyle = `rgba(0,212,200,${alpha})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(nodes[i].x, nodes[i].y);
+      ctx.lineTo(nodes[j].x, nodes[j].y);
+      ctx.stroke();
+    });
+    nodes.forEach(n => {
+      const pulse = 0.7 + 0.3 * Math.sin(t + n.phase);
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,212,200,${0.6 * pulse})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  });
+}
+
+// Make openDetail accessible from card button onclick
+window.MOF_DATA = MOF_DATA;
+window.openDetail = openDetail;
+</script>
+</body>
+</html>
